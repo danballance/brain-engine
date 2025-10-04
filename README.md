@@ -80,8 +80,4 @@ impl TileGenerator for MyGenerator {
 
 ## Assets
 
-Game assets are located in `assets/` directory at the workspace root.
-
-## License
-
-(Add your license here)
+Game assets are located in `brain-engine-bin/assets/` directory at the workspace root.
