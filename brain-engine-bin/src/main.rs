@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use brain_engine_core::{Map, TileGeneratorDefault};
+use brain_engine_core::{Map, Screen, TileGeneratorDefault};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Component)]
 pub enum PlayerAnimationState {
@@ -40,16 +40,12 @@ fn setup_map(mut commands: Commands, asset_server: ResMut<AssetServer>) {
         tile_exit_probability: 0.5,
     };
     let map = Map::new(GRID_SIZE, tile_generator);
-    let center_offset = (map.size - 1) as f32 / 2.0 * TILE_SIZE;
+    let screen = Screen::new(UVec2::new(map.x as u32, map.y as u32), TILE_SIZE);
     for (position, texture_file_name) in map.iter_tiles() {
         let tile_texture = asset_server.load(texture_file_name);
         commands.spawn((
             Sprite::from_image(tile_texture.clone()),
-            Transform::from_translation(Vec3::new(
-                position.x as f32 * TILE_SIZE - center_offset, // Center the grid
-                position.y as f32 * TILE_SIZE - center_offset,
-                0.0,
-            )),
+            Transform::from_translation(screen.pixel_position(position)),
         ));
     }
     commands.insert_resource(map);
