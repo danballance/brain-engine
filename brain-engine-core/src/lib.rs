@@ -5,9 +5,11 @@
 
 pub mod map;
 pub mod map_tile;
+pub mod screen;
 pub mod tile_generator;
 
 // Re-export commonly used types for convenience
 pub use map::Map;
 pub use map_tile::{Direction, MapTile};
+pub use screen::Screen;
 pub use tile_generator::{TileGenerator, TileGeneratorDefault};
