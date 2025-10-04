@@ -1,4 +1,4 @@
-use crate::map_tile::MapTile;
+use crate::map_tile::{Direction, MapTile};
 use crate::tile_generator::TileGenerator;
 
 use bevy::prelude::*;
@@ -38,5 +38,98 @@ impl<G: TileGenerator> Map<G> {
             let texture_file_name = format!("map-{}-{}.png", *tile_type as u8, *tile_type);
             (position, texture_file_name)
         })
+    }
+
+    pub fn can_move(&self, from: UVec2, to: UVec2) -> bool {
+        if from == to {
+            return false;
+        }
+
+        let max_x = self.x as u32;
+        let max_y = self.y as u32;
+        if from.x >= max_x || from.y >= max_y || to.x >= max_x || to.y >= max_y {
+            return false;
+        }
+
+        let from = from.as_ivec2();
+        let to = to.as_ivec2();
+        let delta = to - from;
+
+        let direction = match (delta.x, delta.y) {
+            (0, 1) => Direction::North,
+            (1, 0) => Direction::East,
+            (0, -1) => Direction::South,
+            (-1, 0) => Direction::West,
+            _ => return false,
+        };
+
+        let Some(from_tile) = self.tiles.get(&from) else {
+            return false;
+        };
+        let Some(to_tile) = self.tiles.get(&to) else {
+            return false;
+        };
+
+        from_tile.directions().contains(&direction)
+            && to_tile
+                .directions()
+                .contains(&direction.opposite())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tile_generator::TileGenerator;
+
+    struct StaticGenerator;
+
+    impl TileGenerator for StaticGenerator {
+        fn tile_at(
+            &self,
+            _tiles: &std::collections::HashMap<IVec2, MapTile>,
+            _location: IVec2,
+        ) -> MapTile {
+            MapTile::NESW
+        }
+    }
+
+    #[test]
+    fn cannot_move_out_of_bounds() {
+        let map = Map::new(2, StaticGenerator);
+
+        assert!(!map.can_move(UVec2::new(0, 0), UVec2::new(2, 0)));
+    }
+
+    #[test]
+    fn cannot_move_when_not_adjacent() {
+        let map = Map::new(4, StaticGenerator);
+
+        assert!(!map.can_move(UVec2::new(0, 0), UVec2::new(0, 2)));
+    }
+
+    #[test]
+    fn cannot_move_without_bidirectional_exits() {
+        let mut map = Map::new(3, StaticGenerator);
+        map.tiles.insert(IVec2::new(0, 0), MapTile::E);
+        map.tiles.insert(IVec2::new(1, 0), MapTile::N);
+
+        assert!(!map.can_move(UVec2::new(0, 0), UVec2::new(1, 0)));
+    }
+
+    #[test]
+    fn can_move_when_exits_align() {
+        let mut map = Map::new(3, StaticGenerator);
+        map.tiles.insert(IVec2::new(0, 0), MapTile::E);
+        map.tiles.insert(IVec2::new(1, 0), MapTile::W);
+
+        assert!(map.can_move(UVec2::new(0, 0), UVec2::new(1, 0)));
+    }
+
+    #[test]
+    fn cannot_move_to_same_tile() {
+        let map = Map::new(3, StaticGenerator);
+
+        assert!(!map.can_move(UVec2::new(1, 1), UVec2::new(1, 1)));
     }
 }
