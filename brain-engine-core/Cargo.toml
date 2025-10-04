@@ -1,0 +1,16 @@
+[package]
+name = "brain-engine-core"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "brain_engine_core"
+path = "src/lib.rs"
+
+[dependencies]
+bevy = "0.16"
+itertools = "0.14.0"
+rand = "0.9.2"
+
+[lints]
+workspace = true

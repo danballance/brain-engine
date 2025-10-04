@@ -3,3 +3,7 @@
 # This file contains environment-specific configuration like linker settings
 .cargo/config.toml
 .direnv/
+
+brain-engine-core/examples/
+
+scratchpad/
