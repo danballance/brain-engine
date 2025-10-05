@@ -31,7 +31,7 @@ impl<G: TileGenerator> Map<G> {
         map
     }
 
-    pub fn iter_tiles(&self) -> impl Iterator<Item = (IVec2, String)> + '_ {
+    pub fn iterate_tiles(&self) -> impl Iterator<Item = (IVec2, String)> + '_ {
         iproduct!(0..self.x, 0..self.y).map(|(x, y)| {
             let position = IVec2::new(x as i32, y as i32);
             let tile_type = self.tiles.get(&position).unwrap();
@@ -40,19 +40,25 @@ impl<G: TileGenerator> Map<G> {
         })
     }
 
-    pub fn can_move(&self, from: UVec2, to: UVec2) -> bool {
+    pub fn can_move(&self, from: IVec2, to: IVec2) -> bool {
         if from == to {
             return false;
         }
 
-        let max_x = self.x as u32;
-        let max_y = self.y as u32;
-        if from.x >= max_x || from.y >= max_y || to.x >= max_x || to.y >= max_y {
+        let max_x = self.x as i32;
+        let max_y = self.y as i32;
+        if from.x < 0
+            || from.y < 0
+            || from.x >= max_x
+            || from.y >= max_y
+            || to.x < 0
+            || to.y < 0
+            || to.x >= max_x
+            || to.y >= max_y
+        {
             return false;
         }
 
-        let from = from.as_ivec2();
-        let to = to.as_ivec2();
         let delta = to - from;
 
         let direction = match (delta.x, delta.y) {
@@ -71,9 +77,7 @@ impl<G: TileGenerator> Map<G> {
         };
 
         from_tile.directions().contains(&direction)
-            && to_tile
-                .directions()
-                .contains(&direction.opposite())
+            && to_tile.directions().contains(&direction.opposite())
     }
 }
 
@@ -98,14 +102,14 @@ mod tests {
     fn cannot_move_out_of_bounds() {
         let map = Map::new(2, StaticGenerator);
 
-        assert!(!map.can_move(UVec2::new(0, 0), UVec2::new(2, 0)));
+        assert!(!map.can_move(IVec2::new(0, 0), IVec2::new(2, 0)));
     }
 
     #[test]
     fn cannot_move_when_not_adjacent() {
         let map = Map::new(4, StaticGenerator);
 
-        assert!(!map.can_move(UVec2::new(0, 0), UVec2::new(0, 2)));
+        assert!(!map.can_move(IVec2::new(0, 0), IVec2::new(0, 2)));
     }
 
     #[test]
@@ -114,7 +118,7 @@ mod tests {
         map.tiles.insert(IVec2::new(0, 0), MapTile::E);
         map.tiles.insert(IVec2::new(1, 0), MapTile::N);
 
-        assert!(!map.can_move(UVec2::new(0, 0), UVec2::new(1, 0)));
+        assert!(!map.can_move(IVec2::new(0, 0), IVec2::new(1, 0)));
     }
 
     #[test]
@@ -123,13 +127,13 @@ mod tests {
         map.tiles.insert(IVec2::new(0, 0), MapTile::E);
         map.tiles.insert(IVec2::new(1, 0), MapTile::W);
 
-        assert!(map.can_move(UVec2::new(0, 0), UVec2::new(1, 0)));
+        assert!(map.can_move(IVec2::new(0, 0), IVec2::new(1, 0)));
     }
 
     #[test]
     fn cannot_move_to_same_tile() {
         let map = Map::new(3, StaticGenerator);
 
-        assert!(!map.can_move(UVec2::new(1, 1), UVec2::new(1, 1)));
+        assert!(!map.can_move(IVec2::new(1, 1), IVec2::new(1, 1)));
     }
 }

@@ -2,7 +2,7 @@ use bevy::prelude::*;
 
 /// Describes the screen dimensions and tile sizing, providing helpers for
 /// converting tile coordinates into pixel positions.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Resource)]
 pub struct Screen {
     dimensions: UVec2,
     tile_size: f32,

@@ -13,6 +13,17 @@ pub enum PlayerAnimationState {
 #[derive(Component)]
 struct AnimationTimer(Timer);
 
+#[derive(Component)]
+struct Player;
+
+#[derive(Component)]
+struct TilePosition(IVec2);
+
+#[derive(Component)]
+struct Move {
+    destination: Vec3,
+}
+
 const TILE_SIZE: f32 = 64.0;
 const GRID_SIZE: usize = 5;
 const PLAYER_SPEED: f32 = 100.0;
@@ -28,8 +39,8 @@ fn main() -> AppExit {
             }),
             ..default()
         }))
-        .add_systems(Startup, (setup_map, setup_player))
-        .add_systems(Update, (handle_input, move_player, animate_sprite))
+        .add_systems(Startup, (setup_map, setup_player).chain())
+        .add_systems(Update, (start_move, animate_move, animate_sprite))
         .run()
 }
 
@@ -41,7 +52,7 @@ fn setup_map(mut commands: Commands, asset_server: ResMut<AssetServer>) {
     };
     let map = Map::new(GRID_SIZE, tile_generator);
     let screen = Screen::new(UVec2::new(map.x as u32, map.y as u32), TILE_SIZE);
-    for (position, texture_file_name) in map.iter_tiles() {
+    for (position, texture_file_name) in map.iterate_tiles() {
         let tile_texture = asset_server.load(texture_file_name);
         commands.spawn((
             Sprite::from_image(tile_texture.clone()),
@@ -49,12 +60,14 @@ fn setup_map(mut commands: Commands, asset_server: ResMut<AssetServer>) {
         ));
     }
     commands.insert_resource(map);
+    commands.insert_resource(screen);
 }
 
 fn setup_player(
     mut commands: Commands,
     asset_server: ResMut<AssetServer>,
     mut asset_texture_atlas_layout: ResMut<Assets<TextureAtlasLayout>>,
+    screen: Res<Screen>,
 ) {
     let player_texture = "16x16-Player-Sheet.png";
     let player_texture_handle = asset_server.load(player_texture);
@@ -63,7 +76,13 @@ fn setup_player(
     let player_texture_atlas_layout_handle =
         asset_texture_atlas_layout.add(player_texture_atlas_layout);
 
+    // Start player at center tile (2, 2)
+    let start_tile = IVec2::new(2, 2);
+    let start_position = screen.pixel_position(start_tile);
+
     commands.spawn((
+        Player,
+        TilePosition(start_tile),
         Sprite::from_atlas_image(
             player_texture_handle,
             TextureAtlas {
@@ -71,49 +90,77 @@ fn setup_player(
                 index: 0,
             },
         ),
-        Transform::from_translation(Vec3::new(0.0, 0.0, 1.0)),
+        Transform::from_translation(start_position),
         PlayerAnimationState::Idle,
         AnimationTimer(Timer::from_seconds(0.15, TimerMode::Repeating)),
     ));
 }
 
-fn handle_input(
+fn start_move(
     keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut PlayerAnimationState>,
+    map: Res<Map<TileGeneratorDefault>>,
+    screen: Res<Screen>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut TilePosition, &mut PlayerAnimationState), Without<Move>>,
 ) {
-    for mut state in query.iter_mut() {
-        let new_state = if keyboard_input.pressed(KeyCode::ArrowLeft) {
-            PlayerAnimationState::WalkWest
-        } else if keyboard_input.pressed(KeyCode::ArrowUp) {
-            PlayerAnimationState::WalkNorth
-        } else if keyboard_input.pressed(KeyCode::ArrowRight) {
-            PlayerAnimationState::WalkEast
+    for (entity, mut tile_position, mut animation_state) in query.iter_mut() {
+        // Only process input when Idle (not currently moving)
+        if *animation_state != PlayerAnimationState::Idle {
+            continue;
+        }
+
+        let dir = if keyboard_input.pressed(KeyCode::ArrowUp) {
+            Some((IVec2::new(0, 1), PlayerAnimationState::WalkNorth))
         } else if keyboard_input.pressed(KeyCode::ArrowDown) {
-            PlayerAnimationState::WalkSouth
+            Some((IVec2::new(0, -1), PlayerAnimationState::WalkSouth))
+        } else if keyboard_input.pressed(KeyCode::ArrowLeft) {
+            Some((IVec2::new(-1, 0), PlayerAnimationState::WalkWest))
+        } else if keyboard_input.pressed(KeyCode::ArrowRight) {
+            Some((IVec2::new(1, 0), PlayerAnimationState::WalkEast))
         } else {
-            PlayerAnimationState::Idle
+            None
         };
 
-        *state = new_state;
+        if let Some((delta, new_animation_state)) = dir {
+            let target = tile_position.0 + delta;
+
+            // Check if movement is valid using Map.can_move
+            if map.can_move(tile_position.0, target) {
+                // Update tile position
+                tile_position.0 = target;
+
+                // Set animation state
+                *animation_state = new_animation_state;
+
+                // Calculate destination pixel position
+                let destination = screen.pixel_position(target);
+
+                // Add Move component to start animation
+                commands.entity(entity).insert(Move { destination });
+            }
+        }
     }
 }
 
-fn move_player(time: Res<Time>, mut query: Query<(&mut Transform, &PlayerAnimationState)>) {
-    for (mut transform, state) in query.iter_mut() {
-        let movement = match state {
-            PlayerAnimationState::Idle => Vec3::ZERO,
-            PlayerAnimationState::WalkNorth => {
-                Vec3::new(0.0, PLAYER_SPEED * time.delta_secs(), 0.0)
-            }
-            PlayerAnimationState::WalkEast => Vec3::new(PLAYER_SPEED * time.delta_secs(), 0.0, 0.0),
-            PlayerAnimationState::WalkSouth => {
-                Vec3::new(0.0, -PLAYER_SPEED * time.delta_secs(), 0.0)
-            }
-            PlayerAnimationState::WalkWest => {
-                Vec3::new(-PLAYER_SPEED * time.delta_secs(), 0.0, 0.0)
-            }
-        };
-        transform.translation += movement;
+fn animate_move(
+    time: Res<Time>,
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut Transform, &mut PlayerAnimationState, &Move)>,
+) {
+    for (entity, mut transform, mut animation_state, move_component) in query.iter_mut() {
+        let step = PLAYER_SPEED * time.delta_secs();
+        let direction = move_component.destination - transform.translation;
+        let distance = direction.length();
+
+        if distance <= step {
+            // Snap to destination
+            transform.translation = move_component.destination;
+            *animation_state = PlayerAnimationState::Idle;
+            commands.entity(entity).remove::<Move>();
+        } else {
+            // Move toward destination
+            transform.translation += direction.normalize() * step;
+        }
     }
 }
 
