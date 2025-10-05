@@ -1,5 +1,36 @@
 use std::fmt;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TileSet {
+    Room,
+    Corridor,
+}
+
+impl fmt::Display for TileSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TileSet::Room => write!(f, "room"),
+            TileSet::Corridor => write!(f, "corridor"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Tile {
+    pub tile_set: TileSet,
+    pub map_tile: MapTile,
+}
+
+impl Tile {
+    pub fn new(tile_set: TileSet, map_tile: MapTile) -> Self {
+        Self { tile_set, map_tile }
+    }
+
+    pub fn directions(&self) -> Vec<Direction> {
+        self.map_tile.directions()
+    }
+}
+
 #[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Direction {
@@ -278,5 +309,42 @@ mod tests {
         assert_eq!(MapTile::ZERO.to_string(), "ZERO");
         assert_eq!(MapTile::NE.to_string(), "NE");
         assert_eq!(Direction::North.to_string(), "North");
+    }
+
+    #[test]
+    fn tile_set_displays_correctly() {
+        assert_eq!(TileSet::Room.to_string(), "room");
+        assert_eq!(TileSet::Corridor.to_string(), "corridor");
+    }
+
+    #[test]
+    fn tile_new_creates_correct_tile() {
+        let tile = Tile::new(TileSet::Room, MapTile::NESW);
+        assert_eq!(tile.tile_set, TileSet::Room);
+        assert_eq!(tile.map_tile, MapTile::NESW);
+    }
+
+    #[test]
+    fn tile_directions_returns_maptile_directions() {
+        let room_tile = Tile::new(TileSet::Room, MapTile::NE);
+        let corridor_tile = Tile::new(TileSet::Corridor, MapTile::ESW);
+
+        assert_eq!(room_tile.directions(), vec![Direction::North, Direction::East]);
+        assert_eq!(
+            corridor_tile.directions(),
+            vec![Direction::East, Direction::South, Direction::West]
+        );
+    }
+
+    #[test]
+    fn tile_can_be_cloned_and_copied() {
+        let tile1 = Tile::new(TileSet::Corridor, MapTile::NS);
+        let tile2 = tile1;
+        let tile3 = tile1.clone();
+
+        assert_eq!(tile1, tile2);
+        assert_eq!(tile1, tile3);
+        assert_eq!(tile1.tile_set, TileSet::Corridor);
+        assert_eq!(tile1.map_tile, MapTile::NS);
     }
 }

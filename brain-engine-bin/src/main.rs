@@ -49,6 +49,7 @@ fn setup_map(mut commands: Commands, asset_server: ResMut<AssetServer>) {
 
     let tile_generator = TileGeneratorDefault {
         tile_exit_probability: 0.5,
+        room_probability: 0.5,
     };
     let map = Map::new(GRID_SIZE, tile_generator);
     let screen = Screen::new(UVec2::new(map.x as u32, map.y as u32), TILE_SIZE);
