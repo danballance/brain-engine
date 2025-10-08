@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "brain-engine": {
+      "command": "/home/anoni/Code/rust/brain-engine/target/release/brain-engine-mcp",
+      "args": []
+    }
+  }
+}

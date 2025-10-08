@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "brain-engine-core",
     "brain-engine-bin",
+    "brain-engine-mcp",
 ]
 
 # Shared workspace settings
